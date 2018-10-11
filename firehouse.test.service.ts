@@ -44,8 +44,8 @@ export class FirehouseTestService {
     async run() {
         this.log('test::run()');
         // await this.generatePosts();
-        // await this.testUserRegisterLogoutLoginUpdate();
-        // await this.testPostCreate();
+        await this.testUserRegisterLogoutLoginUpdate();
+        await this.testPostCreate();
         await this.testPostList();
     }
 
@@ -248,20 +248,28 @@ export class FirehouseTestService {
     }
 
 
+    /**
+     * `this.generatePosts()` are required.
+     */
     async testPostList() {
         
-        let re = await this.s.postGets({category: 'list-test', limit: 50}).catch(e => e);
-        this.expectSuccess( re, 'Got posts: ', re);
-
-        re = await this.s.postGets({category: 'list-test', limit: 49}).catch(e => e);
-        this.expectSuccess( re, 'Got posts: ', re);
+        let re = await this.s.postGets({category: 'list-test', limit: 5}).catch(e => e);
+        this.expectSuccess( re, 'Got list-test posts: ', re);
 
 
-        re = await this.s.postGets({category: 'list-test', limit: 5}).catch(e => e);
-        this.expectSuccess( re, 'Got posts: ', re);
+
+        re = await this.s.postGets({category: 'cat', limit: 1}).catch(e => e);
+        this.expectSuccess( re, 'Got cat posts: ', re);
+
+        re = await this.s.postGets({category: 'list-test', limit: 4}).catch(e => e);
+        this.expectSuccess( re, 'Got list-test posts: ', re);
+
+
+        re = await this.s.postGets({category: 'list-test', limit: 3}).catch(e => e);
+        this.expectSuccess( re, 'Got list-test posts: ', re);
 
         re = await this.s.postGets({category: 'list-test', limit: 2}).catch(e => e);
-        this.expectSuccess( re, 'Got posts: ', re);
+        this.expectSuccess( re, 'Got list-test posts: ', re);
 
     }
 }

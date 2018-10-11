@@ -110,7 +110,8 @@ export class FirehouseService {
   };
 
 
-  private _cursorPostGets;
+  private _cursorPostGets = null;
+  private postGetsPrevCategory = null;
   constructor(
     public fireAuth: AngularFireAuth,
     public db: AngularFirestore
@@ -336,6 +337,9 @@ export class FirehouseService {
   setPostGetsCursor(doc) {
     this._cursorPostGets = doc;
   }
+  resetPostGetsCursor() {
+    this._cursorPostGets = null;
+  }
 
   async postGets(options: PostGets): Promise<Array<Post>> {
 
@@ -344,6 +348,13 @@ export class FirehouseService {
     if (!options.limit) {
       options.limit = 10;
     }
+
+    if (this.postGetsPrevCategory !== options.category) {
+      this.resetPostGetsCursor();
+      this.postGetsPrevCategory = options.category;
+    }
+
+
 
     let q;
     if (this.postGetsCursor) {
