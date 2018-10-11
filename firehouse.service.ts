@@ -15,6 +15,12 @@ export const ERROR_EMPTY_INPUT = -1;
 export const ERROR_EMPTY_EMAIL = 'empty-email';
 export const ERROR_EMPTY_PASSWORD = 'empty-password';
 export const ERROR_LOGIN_FIRST = 'login-first';
+export const ERROR_PERMISSION_DENIED = 'permission-denied';
+export const ERROR_ID_EMTPY = 'id-empty';
+
+
+export const POST_DELETE = 'Post has been deleted...!';
+
 
 export interface Error {
   code: string;
@@ -36,6 +42,40 @@ export interface Options {
   domain: string;
 }
 
+export interface Post {
+  category: string;   // post category. It is necessary to create.
+  content: string;
+  id: string;         //
+  title: string;
+  uid: string;        // user uid. It is necessary to create.
+  delete: boolean;    // post deleted
+  timestamp_create: any;    //
+  timestamp_update: any;    //
+}
+
+export interface PostCreate {
+  category: string;   // post category. It is necessary to create.
+  content?: string;
+  title?: string;
+  uid: string;        // user uid. It is necessary to create.
+  timestamp_create?: any;    //
+}
+
+export interface PostUpdate {
+  category?: string;   // post category. It is necessary to create.
+  content?: string;
+  title?: string;
+  delete?: boolean;
+  timestamp_update?: any;    //
+}
+
+
+export interface PostGets {
+  category?: string;
+  limit?: number;
+  page?: number; // begin with no 1.
+  uid?: string; // search posts of the users.
+}
 
 @Injectable()
 export class FirehouseService {
@@ -68,6 +108,9 @@ export class FirehouseService {
   private options: Options = {
     domain: 'default-domain'
   };
+
+
+  private _cursorPostGets;
   constructor(
     public fireAuth: AngularFireAuth,
     public db: AngularFirestore
@@ -77,7 +120,7 @@ export class FirehouseService {
     /**
      * @todo test
      */
-    this.auth.onAuthStateChanged( user => this.authChange.next( user ) );
+    this.auth.onAuthStateChanged(user => this.authChange.next(user));
   }
 
   public setOptions(options: Options) {
@@ -90,15 +133,28 @@ export class FirehouseService {
   public get docDomain() {
     return this.db.collection(DATABASE_COLLECTION).doc(this.options.domain);
   }
-  public get colUser() {
+  public get colUsers() {
     return this.docDomain.collection('users');
+  }
+  public get colPosts() {
+    return this.docDomain.collection('posts');
   }
   /**
    * Returns document ref
    * @param uid user uid
    */
   public docUser(uid: string) {
-    return this.colUser.doc(uid);
+    return this.colUsers.doc(uid);
+  }
+  /**
+   * Returns document ref of the post
+   * @param id post id
+   */
+  public docPost(id: string) {
+    // if ( !id ) {
+    //   throw this.error(ERROR_ID_EMTPY, 'Document ID must be provided to get a post...');
+    // }
+    return this.colPosts.doc(id);
   }
 
   /**
@@ -138,10 +194,10 @@ export class FirehouseService {
 
     userData.uid = re.user.uid;
 
-    const ref = this.colUser.doc(userData.uid);
-    console.log('ref: ', ref.ref.path);
+    const ref = this.colUsers.doc(userData.uid);
+    // console.log('ref: ', ref.ref.path);
 
-    console.log('userData: ', userData);
+    // console.log('userData: ', userData);
     await ref.set(userData);
 
     return re.user;
@@ -201,6 +257,17 @@ export class FirehouseService {
   }
 
   /**
+   * Returns currently login user's uid or null.
+   */
+  get myUid(): string {
+    if (this.currentUser) {
+      return this.currentUser.uid;
+    } else {
+      return null;
+    }
+  }
+
+  /**
    * @todo need test
    */
   get isLoggedIn(): boolean {
@@ -220,7 +287,121 @@ export class FirehouseService {
    * @todo test
    */
   isError(obj) {
-    return obj && obj['code'] !== void 0;
+    if (obj && obj['code'] !== void 0) {
+      return true;
+    }
+
+    // if ( obj instanceof )
+
+    return false;
   }
+
+
+
+  /**
+   * Forum related codes
+   * ------------------------------------------
+   */
+  /**
+   * Creates a post and return it.
+   * @desc error will be thrown up.
+   * @param post post data to create
+   */
+  async postCreate(post: PostCreate): Promise<Post> {
+    post.timestamp_create = firebase.firestore.FieldValue.serverTimestamp();
+    const ref = await this.colPosts.add(post);
+    return this.postGet(ref.id);
+  }
+  /**
+   * Returns the post document.
+   * @desc error will be thrown up.
+   * @param id post id
+   */
+  async postGet(id): Promise<Post> {
+    return <any>this.docPost(id).ref.get().then(doc => {
+      if (doc) {
+        const post: Post = <any>doc.data();
+        post.id = id;
+        return post;
+      } else {
+        return null;
+      }
+    });
+  }
+
+
+  get postGetsCursor(): any {
+    return this._cursorPostGets;
+  }
+  setPostGetsCursor(doc) {
+    this._cursorPostGets = doc;
+  }
+
+  async postGets(options: PostGets): Promise<Array<Post>> {
+
+    const posts: Array<Post> = [];
+
+    if (!options.limit) {
+      options.limit = 10;
+    }
+
+    let q;
+    if (this.postGetsCursor) {
+      q = this.colPosts.ref.where('category', '==', options.category)
+        .orderBy('timestamp_create', 'desc')
+        .startAfter(this.postGetsCursor)
+        .limit(options.limit)
+        .get()
+    } else {
+      q = this.colPosts.ref.where('category', '==', options.category)
+        .orderBy('timestamp_create', 'desc')
+        .limit(options.limit)
+        .get()
+    }
+
+    return await q.then(snapshot => {
+      if (snapshot.size) {
+        snapshot.forEach(doc => {
+          // console.log(doc.id, '=>', doc.data());
+          const post: Post = <any>doc.data();
+          post.uid = doc.id;
+          posts.push(post);
+          if (snapshot.size === posts.length) {
+            this.setPostGetsCursor(doc);
+          }
+        });
+      }
+      return posts;
+    })
+  }
+
+
+  /**
+   * Updates a post partially.
+   * @desc you can pass only few properties that you want to update.
+   * @param id post id to update.
+   * @param post post data to update. It can be a partial post data object.
+   */
+  async postUpdate(id: string, post: PostUpdate): Promise<Post> {
+    post.timestamp_update = firebase.firestore.FieldValue.serverTimestamp();
+    await this.docPost(id).update(post);
+    return this.postGet(id);
+  }
+  /**
+   * Delete a post.
+   * 
+   * @return Promise of Post
+   *    - delete post
+   *    - or errror is thown up.
+   */
+  async postDelete(id: string): Promise<Post> {
+    const post: PostUpdate = {
+      title: POST_DELETE,
+      content: POST_DELETE,
+      delete: true
+    };
+    return await this.postUpdate(id, post);
+  }
+
 }
 
