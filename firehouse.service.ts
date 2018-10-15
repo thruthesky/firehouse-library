@@ -4,7 +4,7 @@ import { AngularFirestore } from '@angular/fire/firestore';
 import { AngularFireAuth } from '@angular/fire/auth';
 import * as firebase from 'firebase/app';
 import { auth } from 'firebase/app';
-import { Subject } from 'rxjs';
+
 
 
 /**
@@ -103,7 +103,7 @@ export class FirehouseService {
             this.render();
         });
    */
-  authChange: Subject<firebase.User> = new Subject<firebase.User>();
+  // authChange: Subject<firebase.User> = new Subject<firebase.User>();
 
   private options: Options = {
     domain: 'default-domain'
@@ -121,7 +121,7 @@ export class FirehouseService {
     /**
      * @todo test
      */
-    this.auth.onAuthStateChanged(user => this.authChange.next(user));
+    // this.auth.onAuthStateChanged(user => this.authChange.next(user));
   }
 
   public setOptions(options: Options) {
